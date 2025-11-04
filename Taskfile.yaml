@@ -1,0 +1,124 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: "3"
+
+tasks:
+  # install
+  install:
+    deps:
+      - install:go
+      - install:pnpm
+    aliases:
+      - default
+
+  install:go:
+    cmds:
+      - go install github.com/evilmartians/lefthook/v2@latest
+      - lefthook install
+      - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
+      - go install github.com/goreleaser/goreleaser/v2@latest
+      - go install github.com/git-chglog/git-chglog/cmd/git-chglog@latest
+    preconditions:
+      - which go
+
+  install:pnpm:
+    cmds:
+      - pnpm install
+    preconditions:
+      - which pnpm
+
+  # clean
+  clean:
+    deps:
+      - clean:go
+      - clean:pnpm
+
+  clean:go:
+    cmds:
+      - lefthook uninstall
+      - rm -f $(go env GOPATH)/bin/lefthook
+      - rm -f $(go env GOPATH)/bin/golangci-lint
+      - rm -f $(go env GOPATH)/bin/goreleaser
+      - rm -f $(go env GOPATH)/bin/git-chglog
+      - go clean -modcache
+    preconditions:
+      - which go
+
+  clean:pnpm:
+    cmds:
+      - rm -rf node_modules .pnpm-store
+
+  # lint
+  lint:
+    deps:
+      - lint:go
+      - lint:prettier
+
+  lint:go:
+    cmds:
+      - golangci-lint run {{ .Options }} ${TARGETS}
+    preconditions:
+      - which golangci-lint
+    env:
+      TARGETS: ./...
+
+  lint:prettier:
+    cmds:
+      - pnpm prettier --check {{ .Options }} ${TARGETS}
+    preconditions:
+      - which pnpm
+    env:
+      TARGETS: . !pnpm-lock.yaml
+
+  # format
+  format:
+    cmds:
+      - task: format:go
+      - task: format:prettier
+
+  format:go:
+    cmds:
+      - task: lint:go
+        vars:
+          Options: --fix
+
+  format:prettier:
+    cmds:
+      - task: lint:prettier
+        vars:
+          Options: --write
+
+  # build
+  build:
+    cmds:
+      - GOVERSION=$(go env GOVERSION) goreleaser {{ or .SubCommand "build" }} --clean --skip=validate {{ .Options }}
+    preconditions:
+      - which go
+      - which goreleaser
+
+  build:snapshot:
+    cmds:
+      - task: build
+        vars:
+          Options: --snapshot
+
+  # archive
+  archive:
+    cmds:
+      - task: build
+        vars:
+          SubCommand: release
+          Options: --skip=publish
+
+  archive:snapshot:
+    cmds:
+      - task: build
+        vars:
+          SubCommand: release
+          Options: --skip=publish --snapshot
+
+  # changelog
+  changelog:
+    cmds:
+      - git-chglog --config .chglog/config.yaml --output CHANGELOG.md {{ if .NEXT_VERSION }}--next-tag ${NEXT_VERSION}{{ end }}
+    preconditions:
+      - which git-chglog
