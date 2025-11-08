@@ -18,23 +18,42 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package main
+package model
 
 import (
-	"context"
-	"os"
-
-	"github.com/Aton-Kish/mcmod-releaser/internal/mcmod-releaser/registry"
+	"fmt"
 )
 
-func main() {
-	ctx := context.Background()
-	reg := registry.New()
+type AppErrorCode string
 
-	cmd := reg.RootCommand
-	cmd.AddCommand(reg.VersionCommand)
+const (
+	AppErrorCodeUnexpectedError AppErrorCode = "UNEXPECTED_ERROR"
+)
 
-	if err := cmd.ExecuteContext(ctx); err != nil {
-		os.Exit(1)
+type AppError struct {
+	Code    AppErrorCode
+	Message string
+	Err     error
+}
+
+func NewAppError(code AppErrorCode, message string, err error) *AppError {
+	return &AppError{
+		Code:    code,
+		Message: message,
+		Err:     err,
 	}
+}
+
+func (e *AppError) Error() string {
+	s := fmt.Sprintf("%s error: %s: %s", AppName, e.Code, e.Message)
+
+	if e.Err == nil {
+		return s
+	}
+
+	return fmt.Sprintf("%s: %s", s, e.Err.Error())
+}
+
+func (e *AppError) Unwrap() error {
+	return e.Err
 }

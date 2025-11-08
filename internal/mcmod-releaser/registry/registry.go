@@ -18,23 +18,33 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package main
+package registry
 
 import (
-	"context"
-	"os"
+	"github.com/spf13/cobra"
 
-	"github.com/Aton-Kish/mcmod-releaser/internal/mcmod-releaser/registry"
+	"github.com/Aton-Kish/mcmod-releaser/internal/mcmod-releaser/command"
+	"github.com/Aton-Kish/mcmod-releaser/internal/mcmod-releaser/model"
 )
 
-func main() {
-	ctx := context.Background()
-	reg := registry.New()
+type Registry struct {
+	AppVersion *model.AppVersion
 
-	cmd := reg.RootCommand
-	cmd.AddCommand(reg.VersionCommand)
+	RootCommand    *cobra.Command
+	VersionCommand *cobra.Command
+}
 
-	if err := cmd.ExecuteContext(ctx); err != nil {
-		os.Exit(1)
+func New() *Registry {
+	reg := &Registry{
+		AppVersion: model.NewAppVersion(),
 	}
+
+	reg.initCommand()
+
+	return reg
+}
+
+func (r *Registry) initCommand() {
+	r.RootCommand = command.NewRootCommand(r.AppVersion)
+	r.VersionCommand = command.NewVersionCommand(r.AppVersion)
 }

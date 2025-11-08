@@ -18,23 +18,56 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package main
+package command
 
 import (
-	"context"
+	"errors"
+	"io"
 	"os"
 
-	"github.com/Aton-Kish/mcmod-releaser/internal/mcmod-releaser/registry"
+	"github.com/Aton-Kish/mcmod-releaser/internal/mcmod-releaser/model"
 )
 
-func main() {
-	ctx := context.Background()
-	reg := registry.New()
+type stdio struct {
+	in  io.Reader
+	out io.Writer
+	err io.Writer
+}
 
-	cmd := reg.RootCommand
-	cmd.AddCommand(reg.VersionCommand)
+var (
+	defaultStdio = stdio{in: os.Stdin, out: os.Stdout, err: os.Stderr}
+)
 
-	if err := cmd.ExecuteContext(ctx); err != nil {
-		os.Exit(1)
+type options struct {
+	stdio stdio
+}
+
+type OptionFunc func(o *options)
+
+func newOptions(optFns ...OptionFunc) *options {
+	o := &options{
+		stdio: defaultStdio,
+	}
+
+	for _, fn := range optFns {
+		fn(o)
+	}
+
+	return o
+}
+
+func WithStdio(in io.Reader, out, err io.Writer) OptionFunc {
+	return func(o *options) {
+		o.stdio = stdio{in: in, out: out, err: err}
+	}
+}
+
+func handleError(errp *error) {
+	if errp == nil || *errp == nil {
+		return
+	}
+
+	if appErr := new(model.AppError); !errors.As(*errp, &appErr) {
+		*errp = model.NewAppError(model.AppErrorCodeUnexpectedError, "Unexpected error occurred.", *errp)
 	}
 }

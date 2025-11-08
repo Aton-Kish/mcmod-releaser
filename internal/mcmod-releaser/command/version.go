@@ -18,23 +18,42 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package main
+package command
 
 import (
-	"context"
-	"os"
+	"encoding/json"
+	"fmt"
 
-	"github.com/Aton-Kish/mcmod-releaser/internal/mcmod-releaser/registry"
+	"github.com/spf13/cobra"
+
+	"github.com/Aton-Kish/mcmod-releaser/internal/mcmod-releaser/model"
 )
 
-func main() {
-	ctx := context.Background()
-	reg := registry.New()
+func NewVersionCommand(version *model.AppVersion, optFns ...OptionFunc) *cobra.Command {
+	opts := newOptions(optFns...)
+	cmd := &cobra.Command{
+		Use:   "version",
+		Short: fmt.Sprintf("Display the %s version.", model.AppName),
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
+			defer handleError(&err)
 
-	cmd := reg.RootCommand
-	cmd.AddCommand(reg.VersionCommand)
+			data, err := json.Marshal(version)
+			if err != nil {
+				return err
+			}
 
-	if err := cmd.ExecuteContext(ctx); err != nil {
-		os.Exit(1)
+			if _, err := fmt.Fprintln(opts.stdio.out, string(data)); err != nil {
+				return err
+			}
+
+			return nil
+		},
+		SilenceUsage: true,
 	}
+
+	cmd.SetIn(opts.stdio.in)
+	cmd.SetOut(opts.stdio.err)
+	cmd.SetErr(opts.stdio.err)
+
+	return cmd
 }

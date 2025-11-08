@@ -18,23 +18,37 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package main
+package command
 
 import (
-	"context"
-	"os"
+	"fmt"
 
-	"github.com/Aton-Kish/mcmod-releaser/internal/mcmod-releaser/registry"
+	"github.com/spf13/cobra"
+
+	"github.com/Aton-Kish/mcmod-releaser/internal/mcmod-releaser/model"
 )
 
-func main() {
-	ctx := context.Background()
-	reg := registry.New()
+func NewRootCommand(version *model.AppVersion, optFns ...OptionFunc) *cobra.Command {
+	opts := newOptions(optFns...)
+	cmd := &cobra.Command{
+		Use:     model.AppName,
+		Short:   "Minecraft Mod Releaser",
+		Version: fmt.Sprintf("%s built with %s from %s on %s/%s", version.Version, version.GoVersion, version.GitCommit, version.OS, version.Arch),
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
+			defer handleError(&err)
 
-	cmd := reg.RootCommand
-	cmd.AddCommand(reg.VersionCommand)
+			if err := cmd.Help(); err != nil {
+				return err
+			}
 
-	if err := cmd.ExecuteContext(ctx); err != nil {
-		os.Exit(1)
+			return nil
+		},
+		SilenceUsage: true,
 	}
+
+	cmd.SetIn(opts.stdio.in)
+	cmd.SetOut(opts.stdio.err)
+	cmd.SetErr(opts.stdio.err)
+
+	return cmd
 }
