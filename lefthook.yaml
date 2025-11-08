@@ -24,3 +24,8 @@ commit-msg:
   commands:
     commitlint:
       run: pnpm commitlint --edit {1}
+
+pre-push:
+  commands:
+    vulncheck:
+      run: task vulncheck
