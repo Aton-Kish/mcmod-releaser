@@ -1,0 +1,174 @@
+// Copyright (c) 2025 Aton-Kish
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+package command
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"maps"
+	"slices"
+	"strconv"
+
+	"github.com/Aton-Kish/mcmod-releaser/internal/curseforge"
+	"github.com/Aton-Kish/mcmod-releaser/internal/mcmod-releaser/model"
+)
+
+type CurseForgeRepository interface {
+	CreateMod(ctx context.Context, file io.Reader, mod *model.Mod) (*model.Mod, error)
+}
+
+type curseForgeRepository struct {
+	client curseforge.Client
+}
+
+func NewCurseForgeRepository(token string) (CurseForgeRepository, error) {
+	c, err := curseforge.NewClient(token)
+	if err != nil {
+		return nil, err
+	}
+
+	return &curseForgeRepository{
+		client: c,
+	}, nil
+}
+
+func (c *curseForgeRepository) CreateMod(ctx context.Context, file io.Reader, mod *model.Mod) (*model.Mod, error) {
+	projectID, err := strconv.Atoi(mod.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+
+	releaseType, err := c.convertReleaseType(mod.ReleaseType)
+	if err != nil {
+		return nil, err
+	}
+
+	relations, err := c.convertDependencies(mod.Dependencies)
+	if err != nil {
+		return nil, err
+	}
+
+	gameVersionTypes, err := c.client.GameVersionTypes(ctx, &curseforge.GameVersionTypesInput{})
+	if err != nil {
+		return nil, err
+	}
+
+	gameVersionTypeIDs := make([]int, 0, len(*gameVersionTypes))
+	for _, gameVersionType := range *gameVersionTypes {
+		gameVersionTypeIDs = append(gameVersionTypeIDs, gameVersionType.ID)
+	}
+
+	gameVersions, err := c.client.GameVersions(ctx, &curseforge.GameVersionsInput{})
+	if err != nil {
+		return nil, err
+	}
+
+	gameVersionIDs := make([]int, 0, len(mod.Environments)+len(mod.Loaders)+len(mod.JavaVersions)+len(mod.GameVersions))
+	for _, gameVersion := range *gameVersions {
+		if !slices.Contains(gameVersionTypeIDs, gameVersion.GameVersionTypeID) {
+			continue
+		}
+
+		if !slices.Contains(mod.Environments, gameVersion.Name) && !slices.Contains(mod.Loaders, gameVersion.Name) && !slices.Contains(mod.JavaVersions, gameVersion.Name) && !slices.Contains(mod.GameVersions, gameVersion.Name) {
+			continue
+		}
+
+		gameVersionIDs = append(gameVersionIDs, gameVersion.ID)
+	}
+
+	uploaded, err := c.client.ProjectUploadFile(ctx, &curseforge.ProjectUploadFileInput{
+		ProjectID: projectID,
+		File:      file,
+		Metadata: &curseforge.ProjectUploadFileMetadata{
+			DisplayName:   mod.Name,
+			GameVersions:  gameVersionIDs,
+			ReleaseType:   releaseType,
+			ChangelogType: curseforge.ProjectUploadFileMetadataChangelogTypeMarkdown,
+			Changelog:     mod.Changelog,
+			Relations:     relations,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.Mod{
+		ID:           strconv.Itoa(uploaded.ID),
+		ProjectID:    mod.ProjectID,
+		ReleaseType:  mod.ReleaseType,
+		Version:      mod.Version,
+		Name:         mod.Name,
+		Changelog:    mod.Changelog,
+		Environments: mod.Environments,
+		Loaders:      mod.Loaders,
+		JavaVersions: mod.JavaVersions,
+		GameVersions: mod.GameVersions,
+		Dependencies: maps.Clone(mod.Dependencies),
+	}, nil
+}
+
+func (c *curseForgeRepository) convertReleaseType(v model.ModReleaseType) (curseforge.ProjectUploadFileMetadataReleaseType, error) {
+	switch v {
+	case model.ModReleaseTypeRelease:
+		return curseforge.ProjectUploadFileMetadataReleaseTypeRelease, nil
+	case model.ModReleaseTypeBeta:
+		return curseforge.ProjectUploadFileMetadataReleaseTypeBeta, nil
+	case model.ModReleaseTypeAlpha:
+		return curseforge.ProjectUploadFileMetadataReleaseTypeAlpha, nil
+	default:
+		return "", fmt.Errorf("invalid release type: %s", v)
+	}
+}
+
+func (c *curseForgeRepository) convertDependency(v model.ModDependencyType) (curseforge.ProjectUploadFileMetadataRelationsProjectType, error) {
+	switch v {
+	case model.ModDependencyTypeRequired:
+		return curseforge.ProjectUploadFileMetadataRelationsProjectTypeRequiredDependency, nil
+	case model.ModDependencyTypeOptional:
+		return curseforge.ProjectUploadFileMetadataRelationsProjectTypeOptionalDependency, nil
+	case model.ModDependencyTypeIncompatible:
+		return curseforge.ProjectUploadFileMetadataRelationsProjectTypeIncompatible, nil
+	case model.ModDependencyTypeEmbedded:
+		return curseforge.ProjectUploadFileMetadataRelationsProjectTypeEmbeddedLibrary, nil
+	case model.ModDependencyTypeTool:
+		return curseforge.ProjectUploadFileMetadataRelationsProjectTypeTool, nil
+	default:
+		return "", fmt.Errorf("invalid dependency type: %s", v)
+	}
+}
+
+func (c *curseForgeRepository) convertDependencies(v map[string]model.ModDependencyType) (*curseforge.ProjectUploadFileMetadataRelations, error) {
+	ps := make([]curseforge.ProjectUploadFileMetadataRelationsProject, 0, len(v))
+	for k, v := range v {
+		d, err := c.convertDependency(v)
+		if err != nil {
+			return nil, err
+		}
+
+		ps = append(ps, curseforge.ProjectUploadFileMetadataRelationsProject{
+			Slug: k,
+			Type: d,
+		})
+	}
+
+	return &curseforge.ProjectUploadFileMetadataRelations{Projects: ps}, nil
+}
