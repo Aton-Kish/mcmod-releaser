@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package command
+package repository
 
 import (
 	"context"
@@ -51,56 +51,33 @@ func NewCurseForgeRepository(token string) (CurseForgeRepository, error) {
 	}, nil
 }
 
-func (c *curseForgeRepository) CreateMod(ctx context.Context, file io.Reader, mod *model.Mod) (*model.Mod, error) {
+func (r *curseForgeRepository) CreateMod(ctx context.Context, file io.Reader, mod *model.Mod) (*model.Mod, error) {
 	projectID, err := strconv.Atoi(mod.ProjectID)
 	if err != nil {
 		return nil, err
 	}
 
-	releaseType, err := c.convertReleaseType(mod.ReleaseType)
+	releaseType, err := r.convertReleaseType(ctx, mod.ReleaseType)
 	if err != nil {
 		return nil, err
 	}
 
-	relations, err := c.convertDependencies(mod.Dependencies)
+	relations, err := r.convertDependencies(ctx, mod.Dependencies)
 	if err != nil {
 		return nil, err
 	}
 
-	gameVersionTypes, err := c.client.GameVersionTypes(ctx, &curseforge.GameVersionTypesInput{})
+	gameVersions, err := r.convertGameVersions(ctx, slices.Concat(mod.Environments, mod.Loaders, mod.JavaVersions, mod.GameVersions))
 	if err != nil {
 		return nil, err
 	}
 
-	gameVersionTypeIDs := make([]int, 0, len(*gameVersionTypes))
-	for _, gameVersionType := range *gameVersionTypes {
-		gameVersionTypeIDs = append(gameVersionTypeIDs, gameVersionType.ID)
-	}
-
-	gameVersions, err := c.client.GameVersions(ctx, &curseforge.GameVersionsInput{})
-	if err != nil {
-		return nil, err
-	}
-
-	gameVersionIDs := make([]int, 0, len(mod.Environments)+len(mod.Loaders)+len(mod.JavaVersions)+len(mod.GameVersions))
-	for _, gameVersion := range *gameVersions {
-		if !slices.Contains(gameVersionTypeIDs, gameVersion.GameVersionTypeID) {
-			continue
-		}
-
-		if !slices.Contains(mod.Environments, gameVersion.Name) && !slices.Contains(mod.Loaders, gameVersion.Name) && !slices.Contains(mod.JavaVersions, gameVersion.Name) && !slices.Contains(mod.GameVersions, gameVersion.Name) {
-			continue
-		}
-
-		gameVersionIDs = append(gameVersionIDs, gameVersion.ID)
-	}
-
-	uploaded, err := c.client.ProjectUploadFile(ctx, &curseforge.ProjectUploadFileInput{
+	uploaded, err := r.client.ProjectUploadFile(ctx, &curseforge.ProjectUploadFileInput{
 		ProjectID: projectID,
 		File:      file,
 		Metadata: &curseforge.ProjectUploadFileMetadata{
 			DisplayName:   mod.Name,
-			GameVersions:  gameVersionIDs,
+			GameVersions:  gameVersions,
 			ReleaseType:   releaseType,
 			ChangelogType: curseforge.ProjectUploadFileMetadataChangelogTypeMarkdown,
 			Changelog:     mod.Changelog,
@@ -126,7 +103,7 @@ func (c *curseForgeRepository) CreateMod(ctx context.Context, file io.Reader, mo
 	}, nil
 }
 
-func (c *curseForgeRepository) convertReleaseType(v model.ModReleaseType) (curseforge.ProjectUploadFileMetadataReleaseType, error) {
+func (r *curseForgeRepository) convertReleaseType(ctx context.Context, v model.ModReleaseType) (curseforge.ProjectUploadFileMetadataReleaseType, error) {
 	switch v {
 	case model.ModReleaseTypeRelease:
 		return curseforge.ProjectUploadFileMetadataReleaseTypeRelease, nil
@@ -139,7 +116,7 @@ func (c *curseForgeRepository) convertReleaseType(v model.ModReleaseType) (curse
 	}
 }
 
-func (c *curseForgeRepository) convertDependency(v model.ModDependencyType) (curseforge.ProjectUploadFileMetadataRelationsProjectType, error) {
+func (r *curseForgeRepository) convertDependency(ctx context.Context, v model.ModDependencyType) (curseforge.ProjectUploadFileMetadataRelationsProjectType, error) {
 	switch v {
 	case model.ModDependencyTypeRequired:
 		return curseforge.ProjectUploadFileMetadataRelationsProjectTypeRequiredDependency, nil
@@ -156,10 +133,10 @@ func (c *curseForgeRepository) convertDependency(v model.ModDependencyType) (cur
 	}
 }
 
-func (c *curseForgeRepository) convertDependencies(v map[string]model.ModDependencyType) (*curseforge.ProjectUploadFileMetadataRelations, error) {
+func (r *curseForgeRepository) convertDependencies(ctx context.Context, v map[string]model.ModDependencyType) (*curseforge.ProjectUploadFileMetadataRelations, error) {
 	ps := make([]curseforge.ProjectUploadFileMetadataRelationsProject, 0, len(v))
 	for k, v := range v {
-		d, err := c.convertDependency(v)
+		d, err := r.convertDependency(ctx, v)
 		if err != nil {
 			return nil, err
 		}
@@ -171,4 +148,30 @@ func (c *curseForgeRepository) convertDependencies(v map[string]model.ModDepende
 	}
 
 	return &curseforge.ProjectUploadFileMetadataRelations{Projects: ps}, nil
+}
+
+func (r *curseForgeRepository) convertGameVersions(ctx context.Context, v []string) ([]int, error) {
+	gameVersionTypes, err := r.client.GameVersionTypes(ctx, &curseforge.GameVersionTypesInput{})
+	if err != nil {
+		return nil, err
+	}
+
+	gameVersionTypeIDs := make([]int, 0, len(*gameVersionTypes))
+	for _, gameVersionType := range *gameVersionTypes {
+		gameVersionTypeIDs = append(gameVersionTypeIDs, gameVersionType.ID)
+	}
+
+	gameVersions, err := r.client.GameVersions(ctx, &curseforge.GameVersionsInput{})
+	if err != nil {
+		return nil, err
+	}
+
+	gameVersionIDs := make([]int, 0, len(v))
+	for _, gameVersion := range *gameVersions {
+		if slices.Contains(gameVersionTypeIDs, gameVersion.GameVersionTypeID) && slices.Contains(v, gameVersion.Name) {
+			gameVersionIDs = append(gameVersionIDs, gameVersion.ID)
+		}
+	}
+
+	return gameVersionIDs, nil
 }

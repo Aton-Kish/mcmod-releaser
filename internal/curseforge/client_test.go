@@ -116,7 +116,6 @@ func Test_client_GameVersionTypes(t *testing.T) {
 			if tt.wantErr {
 				e := new(Error)
 				assert.ErrorAs(t, err, &e)
-				t.Log(err)
 				assert.Nil(t, got)
 			} else {
 				assert.NoError(t, err)
