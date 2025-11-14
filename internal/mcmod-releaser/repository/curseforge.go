@@ -23,8 +23,8 @@ package repository
 import (
 	"context"
 	"fmt"
-	"io"
 	"maps"
+	"os"
 	"slices"
 	"strconv"
 
@@ -33,7 +33,7 @@ import (
 )
 
 type CurseForgeRepository interface {
-	CreateMod(ctx context.Context, file io.Reader, mod *model.Mod) (*model.Mod, error)
+	CreateMod(ctx context.Context, path string, mod *model.Mod) (*model.Mod, error)
 }
 
 type curseForgeRepository struct {
@@ -51,7 +51,15 @@ func NewCurseForgeRepository(token string) (CurseForgeRepository, error) {
 	}, nil
 }
 
-func (r *curseForgeRepository) CreateMod(ctx context.Context, file io.Reader, mod *model.Mod) (*model.Mod, error) {
+func (r *curseForgeRepository) CreateMod(ctx context.Context, path string, mod *model.Mod) (*model.Mod, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
 	projectID, err := strconv.Atoi(mod.ProjectID)
 	if err != nil {
 		return nil, err

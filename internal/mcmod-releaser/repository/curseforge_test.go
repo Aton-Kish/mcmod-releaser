@@ -21,10 +21,10 @@
 package repository
 
 import (
-	"bytes"
 	"context"
-	"io"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"testing"
 
@@ -54,11 +54,14 @@ func Test_curseForgeRepository_CreateMod(t *testing.T) {
 	invalidProjectID := 999999
 	s.RegisterProjectID(validProjectID)
 
+	tempFilePath := filepath.Join(t.TempDir(), "mod.jar")
+	assert.NoError(t, os.WriteFile(tempFilePath, []byte{}, 0o644))
+
 	tests := []struct {
 		name         string
 		apiToken     string
 		isServerDown bool
-		file         io.Reader
+		filePath     string
 		mod          *model.Mod
 		want         *model.Mod
 		wantErr      bool
@@ -67,7 +70,7 @@ func Test_curseForgeRepository_CreateMod(t *testing.T) {
 			name:         "happy path",
 			apiToken:     validAPIToken,
 			isServerDown: false,
-			file:         bytes.NewBufferString("mod.jar"),
+			filePath:     tempFilePath,
 			mod: &model.Mod{
 				ProjectID:    strconv.Itoa(validProjectID),
 				ReleaseType:  model.ModReleaseTypeRelease,
@@ -107,7 +110,7 @@ func Test_curseForgeRepository_CreateMod(t *testing.T) {
 			name:         "edge path: missing API token",
 			apiToken:     "",
 			isServerDown: false,
-			file:         bytes.NewBufferString("mod.jar"),
+			filePath:     tempFilePath,
 			mod: &model.Mod{
 				ProjectID:    strconv.Itoa(validProjectID),
 				ReleaseType:  model.ModReleaseTypeRelease,
@@ -131,7 +134,7 @@ func Test_curseForgeRepository_CreateMod(t *testing.T) {
 			name:         "edge path: malformed API token",
 			apiToken:     "malformed-api-token",
 			isServerDown: false,
-			file:         bytes.NewBufferString("mod.jar"),
+			filePath:     tempFilePath,
 			mod: &model.Mod{
 				ProjectID:    strconv.Itoa(validProjectID),
 				ReleaseType:  model.ModReleaseTypeRelease,
@@ -155,7 +158,7 @@ func Test_curseForgeRepository_CreateMod(t *testing.T) {
 			name:         "edge path: invalid API token",
 			apiToken:     invalidAPIToken,
 			isServerDown: false,
-			file:         bytes.NewBufferString("mod.jar"),
+			filePath:     tempFilePath,
 			mod: &model.Mod{
 				ProjectID:    strconv.Itoa(validProjectID),
 				ReleaseType:  model.ModReleaseTypeRelease,
@@ -179,7 +182,7 @@ func Test_curseForgeRepository_CreateMod(t *testing.T) {
 			name:         "edge path: missing required properties",
 			apiToken:     validAPIToken,
 			isServerDown: false,
-			file:         bytes.NewBufferString("mod.jar"),
+			filePath:     tempFilePath,
 			mod:          &model.Mod{},
 			want:         nil,
 			wantErr:      true,
@@ -188,7 +191,7 @@ func Test_curseForgeRepository_CreateMod(t *testing.T) {
 			name:         "edge path: invalid project ID",
 			apiToken:     validAPIToken,
 			isServerDown: false,
-			file:         bytes.NewBufferString("mod.jar"),
+			filePath:     tempFilePath,
 			mod: &model.Mod{
 				ProjectID:    strconv.Itoa(invalidProjectID),
 				ReleaseType:  model.ModReleaseTypeRelease,
@@ -212,7 +215,7 @@ func Test_curseForgeRepository_CreateMod(t *testing.T) {
 			name:         "edge path: server down",
 			apiToken:     validAPIToken,
 			isServerDown: true,
-			file:         bytes.NewBufferString("mod.jar"),
+			filePath:     tempFilePath,
 			mod: &model.Mod{
 				ProjectID:    strconv.Itoa(validProjectID),
 				ReleaseType:  model.ModReleaseTypeRelease,
@@ -248,7 +251,7 @@ func Test_curseForgeRepository_CreateMod(t *testing.T) {
 				client: c,
 			}
 
-			got, err := r.CreateMod(context.Background(), tt.file, tt.mod)
+			got, err := r.CreateMod(context.Background(), tt.filePath, tt.mod)
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Nil(t, got)
