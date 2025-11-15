@@ -21,6 +21,9 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - name: Set environment variables
+        run: |
+          echo "GOVERSION=$(go env GOVERSION)" >> "${GITHUB_ENV}"
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
