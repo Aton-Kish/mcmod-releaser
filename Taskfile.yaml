@@ -89,6 +89,20 @@ tasks:
         vars:
           Options: --write
 
+  # test
+  test:
+    cmds:
+      - go test ./... {{ .Options }}
+    preconditions:
+      - which go
+
+  coverage:
+    cmds:
+      - task: test
+        vars:
+          Options: -cover -coverpkg=./... -coverprofile=coverage.out
+      - go tool cover -html=coverage.out -o coverage.html
+
   # vulnerability check
   vulncheck:
     cmds:

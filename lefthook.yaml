@@ -28,4 +28,4 @@ commit-msg:
 pre-push:
   commands:
     vulncheck:
-      run: task vulncheck
+      run: task test vulncheck
