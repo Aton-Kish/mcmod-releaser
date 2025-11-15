@@ -20,6 +20,10 @@
 
 package model
 
+import (
+	"fmt"
+)
+
 type Mod struct {
 	ID           string                       `json:"id"`
 	ProjectID    string                       `json:"projectId"`
@@ -42,6 +46,19 @@ const (
 	ModReleaseTypeAlpha   ModReleaseType = "alpha"
 )
 
+func NewModReleaseType(v string) (ModReleaseType, error) {
+	switch v {
+	case "release":
+		return ModReleaseTypeRelease, nil
+	case "beta":
+		return ModReleaseTypeBeta, nil
+	case "alpha":
+		return ModReleaseTypeAlpha, nil
+	default:
+		return "", fmt.Errorf("invalid release type: `%s`. allowed values: `release`, `beta`, `alpha`", v)
+	}
+}
+
 type ModDependencyType string
 
 const (
@@ -51,3 +68,20 @@ const (
 	ModDependencyTypeEmbedded     ModDependencyType = "embedded"
 	ModDependencyTypeTool         ModDependencyType = "tool"
 )
+
+func NewModDependencyType(v string) (ModDependencyType, error) {
+	switch v {
+	case "required":
+		return ModDependencyTypeRequired, nil
+	case "optional":
+		return ModDependencyTypeOptional, nil
+	case "incompatible":
+		return ModDependencyTypeIncompatible, nil
+	case "embedded":
+		return ModDependencyTypeEmbedded, nil
+	case "tool":
+		return ModDependencyTypeTool, nil
+	default:
+		return "", fmt.Errorf("invalid dependency type: `%s`. allowed values: `required`, `optional`, `incompatible`, `embedded`, `tool`", v)
+	}
+}

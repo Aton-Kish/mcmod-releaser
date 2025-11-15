@@ -21,31 +21,22 @@
 package model
 
 import (
+	"errors"
 	"fmt"
 )
 
-type AppErrorCode string
-
-const (
-	AppErrorCodeUnexpectedError AppErrorCode = "UNEXPECTED_ERROR"
-)
-
 type AppError struct {
-	Code    AppErrorCode
-	Message string
-	Err     error
+	Err error
 }
 
-func NewAppError(code AppErrorCode, message string, err error) *AppError {
+func NewAppError(err error) *AppError {
 	return &AppError{
-		Code:    code,
-		Message: message,
-		Err:     err,
+		Err: err,
 	}
 }
 
 func (e *AppError) Error() string {
-	s := fmt.Sprintf("%s error: %s: %s", AppName, e.Code, e.Message)
+	s := fmt.Sprintf("%s error", AppName)
 
 	if e.Err == nil {
 		return s
@@ -56,4 +47,14 @@ func (e *AppError) Error() string {
 
 func (e *AppError) Unwrap() error {
 	return e.Err
+}
+
+func WrapAppError(errp *error) {
+	if errp == nil || *errp == nil {
+		return
+	}
+
+	if appErr := new(AppError); !errors.As(*errp, &appErr) {
+		*errp = NewAppError(*errp)
+	}
 }

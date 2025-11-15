@@ -87,3 +87,7 @@ func (v *AppVersion) loadFromBuildInfo() {
 		}
 	}
 }
+
+type AppConfig struct {
+	CurseForgeAPIToken string `env:"CURSEFORGE_API_TOKEN,required"`
+}

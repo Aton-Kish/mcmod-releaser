@@ -22,19 +22,24 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/Aton-Kish/mcmod-releaser/internal/mcmod-releaser/registry"
 )
 
 func main() {
-	ctx := context.Background()
-	reg := registry.New()
+	reg, err := registry.New()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
+		os.Exit(1)
+	}
 
 	cmd := reg.RootCommand
 	cmd.AddCommand(reg.VersionCommand)
+	cmd.AddCommand(reg.CurseForgeCommand)
 
-	if err := cmd.ExecuteContext(ctx); err != nil {
+	if err := cmd.ExecuteContext(context.Background()); err != nil {
 		os.Exit(1)
 	}
 }

@@ -3,6 +3,7 @@ module github.com/Aton-Kish/mcmod-releaser
 go 1.25.3
 
 require (
+	github.com/caarlos0/env/v11 v11.3.1
 	github.com/google/uuid v1.6.0
 	github.com/spf13/cobra v1.10.1
 	github.com/stretchr/testify v1.11.1

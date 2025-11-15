@@ -40,15 +40,10 @@ type curseForgeRepository struct {
 	client curseforge.Client
 }
 
-func NewCurseForgeRepository(token string) (CurseForgeRepository, error) {
-	c, err := curseforge.NewClient(token)
-	if err != nil {
-		return nil, err
-	}
-
+func NewCurseForgeRepository(client curseforge.Client) CurseForgeRepository {
 	return &curseForgeRepository{
-		client: c,
-	}, nil
+		client: client,
+	}
 }
 
 func (r *curseForgeRepository) CreateMod(ctx context.Context, path string, mod *model.Mod) (*model.Mod, error) {

@@ -18,37 +18,47 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package command
+package usecase
 
 import (
-	"fmt"
-
-	"github.com/spf13/cobra"
+	"context"
 
 	"github.com/Aton-Kish/mcmod-releaser/internal/mcmod-releaser/model"
+	"github.com/Aton-Kish/mcmod-releaser/internal/mcmod-releaser/repository"
 )
 
-func NewRootCommand(version *model.AppVersion, optFns ...OptionFunc) *cobra.Command {
-	opts := newOptions(optFns...)
-	cmd := &cobra.Command{
-		Use:     model.AppName,
-		Short:   "Minecraft Mod Releaser",
-		Version: fmt.Sprintf("%s built with %s from %s on %s/%s", version.Version, version.GoVersion, version.GitCommit, version.OS, version.Arch),
-		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			defer model.WrapAppError(&err)
+type CurseForgeInput struct {
+	FilePath string
+	Mod      *model.Mod
+}
 
-			if err := cmd.Help(); err != nil {
-				return err
-			}
+type CurseForgeOutput struct {
+	FilePath string     `json:"file"`
+	Mod      *model.Mod `json:"mod"`
+}
 
-			return nil
-		},
-		SilenceUsage: true,
+type CurseForgeUseCase interface {
+	Execute(ctx context.Context, input *CurseForgeInput) (*CurseForgeOutput, error)
+}
+
+type curseForgeModCreateUseCase struct {
+	curseForgeRepository repository.CurseForgeRepository
+}
+
+func NewCurseForgeUseCase(curseForgeRepository repository.CurseForgeRepository) CurseForgeUseCase {
+	return &curseForgeModCreateUseCase{
+		curseForgeRepository: curseForgeRepository,
+	}
+}
+
+func (u *curseForgeModCreateUseCase) Execute(ctx context.Context, input *CurseForgeInput) (*CurseForgeOutput, error) {
+	mod, err := u.curseForgeRepository.CreateMod(ctx, input.FilePath, input.Mod)
+	if err != nil {
+		return nil, err
 	}
 
-	cmd.SetIn(opts.stdio.in)
-	cmd.SetOut(opts.stdio.err)
-	cmd.SetErr(opts.stdio.err)
-
-	return cmd
+	return &CurseForgeOutput{
+		FilePath: input.FilePath,
+		Mod:      mod,
+	}, nil
 }

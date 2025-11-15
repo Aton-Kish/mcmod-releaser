@@ -35,7 +35,7 @@ func NewVersionCommand(version *model.AppVersion, optFns ...OptionFunc) *cobra.C
 		Use:   "version",
 		Short: fmt.Sprintf("Display the %s version.", model.AppName),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			defer handleError(&err)
+			defer model.WrapAppError(&err)
 
 			data, err := json.Marshal(version)
 			if err != nil {

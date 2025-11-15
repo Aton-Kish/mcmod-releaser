@@ -21,11 +21,8 @@
 package command
 
 import (
-	"errors"
 	"io"
 	"os"
-
-	"github.com/Aton-Kish/mcmod-releaser/internal/mcmod-releaser/model"
 )
 
 type stdio struct {
@@ -59,15 +56,5 @@ func newOptions(optFns ...OptionFunc) *options {
 func WithStdio(in io.Reader, out, err io.Writer) OptionFunc {
 	return func(o *options) {
 		o.stdio = stdio{in: in, out: out, err: err}
-	}
-}
-
-func handleError(errp *error) {
-	if errp == nil || *errp == nil {
-		return
-	}
-
-	if appErr := new(model.AppError); !errors.As(*errp, &appErr) {
-		*errp = model.NewAppError(model.AppErrorCodeUnexpectedError, "Unexpected error occurred.", *errp)
 	}
 }

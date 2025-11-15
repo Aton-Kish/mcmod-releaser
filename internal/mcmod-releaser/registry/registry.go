@@ -21,30 +21,78 @@
 package registry
 
 import (
+	"github.com/caarlos0/env/v11"
 	"github.com/spf13/cobra"
 
+	"github.com/Aton-Kish/mcmod-releaser/internal/curseforge"
 	"github.com/Aton-Kish/mcmod-releaser/internal/mcmod-releaser/command"
 	"github.com/Aton-Kish/mcmod-releaser/internal/mcmod-releaser/model"
+	"github.com/Aton-Kish/mcmod-releaser/internal/mcmod-releaser/repository"
+	"github.com/Aton-Kish/mcmod-releaser/internal/mcmod-releaser/usecase"
 )
 
 type Registry struct {
 	AppVersion *model.AppVersion
+	AppConfig  *model.AppConfig
 
-	RootCommand    *cobra.Command
-	VersionCommand *cobra.Command
+	CurseForgeRepository repository.CurseForgeRepository
+
+	CurseForgeUseCase usecase.CurseForgeUseCase
+
+	RootCommand       *cobra.Command
+	VersionCommand    *cobra.Command
+	CurseForgeCommand *cobra.Command
 }
 
-func New() *Registry {
-	reg := &Registry{
-		AppVersion: model.NewAppVersion(),
+func New() (_ *Registry, err error) {
+	defer model.WrapAppError(&err)
+
+	cfg, err := env.ParseAs[model.AppConfig]()
+	if err != nil {
+		return nil, err
 	}
 
-	reg.initCommand()
+	reg := &Registry{
+		AppVersion: model.NewAppVersion(),
+		AppConfig:  &cfg,
+	}
 
-	return reg
+	if err := reg.initRepository(); err != nil {
+		return nil, err
+	}
+
+	if err := reg.initUseCase(); err != nil {
+		return nil, err
+	}
+
+	if err := reg.initCommand(); err != nil {
+		return nil, err
+	}
+
+	return reg, nil
 }
 
-func (r *Registry) initCommand() {
+func (r *Registry) initRepository() error {
+	curseForgeClient, err := curseforge.NewClient(r.AppConfig.CurseForgeAPIToken)
+	if err != nil {
+		return err
+	}
+
+	r.CurseForgeRepository = repository.NewCurseForgeRepository(curseForgeClient)
+
+	return nil
+}
+
+func (r *Registry) initUseCase() error {
+	r.CurseForgeUseCase = usecase.NewCurseForgeUseCase(r.CurseForgeRepository)
+
+	return nil
+}
+
+func (r *Registry) initCommand() error {
 	r.RootCommand = command.NewRootCommand(r.AppVersion)
 	r.VersionCommand = command.NewVersionCommand(r.AppVersion)
+	r.CurseForgeCommand = command.NewCurseForgeCommand(r.CurseForgeUseCase)
+
+	return nil
 }
