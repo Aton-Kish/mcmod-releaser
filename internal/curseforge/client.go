@@ -214,6 +214,7 @@ const (
 
 type ProjectUploadFileInput struct {
 	ProjectID int
+	FileName  string
 	File      io.Reader
 	Metadata  *ProjectUploadFileMetadata
 }
@@ -225,30 +226,12 @@ type ProjectUploadFileOutput struct {
 func (c *client) ProjectUploadFile(ctx context.Context, input *ProjectUploadFileInput) (output *ProjectUploadFileOutput, err error) {
 	defer handleError(&err)
 
-	body := &bytes.Buffer{}
-	w := multipart.NewWriter(body)
-
-	filePart, err := w.CreateFormFile("file", "mod.jar")
+	body, contentType, err := c.createProjectUploadFileContent(ctx, input, "")
 	if err != nil {
 		return nil, err
 	}
-	if _, err = io.Copy(filePart, input.File); err != nil {
-		return nil, err
-	}
 
-	metadata, err := json.Marshal(input.Metadata)
-	if err != nil {
-		return nil, err
-	}
-	if err := w.WriteField("metadata", string(metadata)); err != nil {
-		return nil, err
-	}
-
-	if err := w.Close(); err != nil {
-		return nil, err
-	}
-
-	data, err := c.do(ctx, http.MethodPost, c.baseURI.JoinPath(fmt.Sprintf("/api/projects/%d/upload-file", input.ProjectID)).String(), http.Header{"Content-Type": {w.FormDataContentType()}}, body)
+	data, err := c.do(ctx, http.MethodPost, c.baseURI.JoinPath(fmt.Sprintf("/api/projects/%d/upload-file", input.ProjectID)).String(), http.Header{"Content-Type": {contentType}}, body)
 	if err != nil {
 		return nil, err
 	}
@@ -259,4 +242,36 @@ func (c *client) ProjectUploadFile(ctx context.Context, input *ProjectUploadFile
 	}
 
 	return &resp, nil
+}
+
+func (c *client) createProjectUploadFileContent(ctx context.Context, input *ProjectUploadFileInput, boundary string) (io.Reader, string, error) {
+	body := &bytes.Buffer{}
+	w := multipart.NewWriter(body)
+	if boundary != "" {
+		if err := w.SetBoundary(boundary); err != nil {
+			return nil, "", err
+		}
+	}
+
+	filePart, err := w.CreateFormFile("file", input.FileName)
+	if err != nil {
+		return nil, "", err
+	}
+	if _, err = io.Copy(filePart, input.File); err != nil {
+		return nil, "", err
+	}
+
+	metadata, err := json.Marshal(input.Metadata)
+	if err != nil {
+		return nil, "", err
+	}
+	if err := w.WriteField("metadata", string(metadata)); err != nil {
+		return nil, "", err
+	}
+
+	if err := w.Close(); err != nil {
+		return nil, "", err
+	}
+
+	return body, w.FormDataContentType(), nil
 }
