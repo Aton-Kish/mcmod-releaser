@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 
@@ -77,6 +78,7 @@ func (r *curseForgeRepository) CreateMod(ctx context.Context, path string, mod *
 
 	uploaded, err := r.client.ProjectUploadFile(ctx, &curseforge.ProjectUploadFileInput{
 		ProjectID: projectID,
+		FileName:  filepath.Base(file.Name()),
 		File:      file,
 		Metadata: &curseforge.ProjectUploadFileMetadata{
 			DisplayName:   mod.Name,

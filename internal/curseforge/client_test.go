@@ -23,7 +23,9 @@ package curseforge
 import (
 	"bytes"
 	"context"
+	"io"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -281,6 +283,7 @@ func Test_client_ProjectUploadFile(t *testing.T) {
 			isServerDown: false,
 			input: &ProjectUploadFileInput{
 				ProjectID: validProjectID,
+				FileName:  "example-mod-1.2.3.jar",
 				File:      bytes.NewBufferString("mod.jar"),
 				Metadata: &ProjectUploadFileMetadata{
 					DisplayName: "Example Mod v1.2.3",
@@ -315,6 +318,7 @@ func Test_client_ProjectUploadFile(t *testing.T) {
 			isServerDown: false,
 			input: &ProjectUploadFileInput{
 				ProjectID: validProjectID,
+				FileName:  "example-mod-1.2.3.jar",
 				File:      bytes.NewBufferString("mod.jar"),
 				Metadata: &ProjectUploadFileMetadata{
 					DisplayName: "Example Mod v1.2.3",
@@ -347,6 +351,7 @@ func Test_client_ProjectUploadFile(t *testing.T) {
 			isServerDown: false,
 			input: &ProjectUploadFileInput{
 				ProjectID: validProjectID,
+				FileName:  "example-mod-1.2.3.jar",
 				File:      bytes.NewBufferString("mod.jar"),
 				Metadata: &ProjectUploadFileMetadata{
 					DisplayName: "Example Mod v1.2.3",
@@ -379,6 +384,7 @@ func Test_client_ProjectUploadFile(t *testing.T) {
 			isServerDown: false,
 			input: &ProjectUploadFileInput{
 				ProjectID: validProjectID,
+				FileName:  "example-mod-1.2.3.jar",
 				File:      bytes.NewBufferString("mod.jar"),
 				Metadata: &ProjectUploadFileMetadata{
 					DisplayName: "Example Mod v1.2.3",
@@ -411,6 +417,7 @@ func Test_client_ProjectUploadFile(t *testing.T) {
 			isServerDown: false,
 			input: &ProjectUploadFileInput{
 				ProjectID: validProjectID,
+				FileName:  "example-mod-1.2.3.jar",
 				File:      bytes.NewBufferString("mod.jar"),
 				Metadata:  &ProjectUploadFileMetadata{},
 			},
@@ -423,6 +430,7 @@ func Test_client_ProjectUploadFile(t *testing.T) {
 			isServerDown: false,
 			input: &ProjectUploadFileInput{
 				ProjectID: invalidProjectID,
+				FileName:  "example-mod-1.2.3.jar",
 				File:      bytes.NewBufferString("mod.jar"),
 				Metadata: &ProjectUploadFileMetadata{
 					DisplayName: "Example Mod v1.2.3",
@@ -455,6 +463,7 @@ func Test_client_ProjectUploadFile(t *testing.T) {
 			isServerDown: true,
 			input: &ProjectUploadFileInput{
 				ProjectID: validProjectID,
+				FileName:  "example-mod-1.2.3.jar",
 				File:      bytes.NewBufferString("mod.jar"),
 				Metadata: &ProjectUploadFileMetadata{
 					DisplayName: "Example Mod v1.2.3",
@@ -501,6 +510,81 @@ func Test_client_ProjectUploadFile(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.want, got)
+			}
+		})
+	}
+}
+
+func Test_client_createProjectUploadFileContent(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    *ProjectUploadFileInput
+		boundary string
+		want     string
+		want2    string
+		wantErr  bool
+	}{
+		{
+			name: "happy path",
+			input: &ProjectUploadFileInput{
+				ProjectID: 123456,
+				FileName:  "example-mod-1.2.3.jar",
+				File:      bytes.NewBufferString("mod.jar"),
+				Metadata: &ProjectUploadFileMetadata{
+					DisplayName: "Example Mod v1.2.3",
+					GameVersions: []int{
+						7499,
+						9638,
+						9639,
+						11135,
+						13927,
+						13964,
+					},
+					ReleaseType:   ProjectUploadFileMetadataReleaseTypeRelease,
+					ChangelogType: ProjectUploadFileMetadataChangelogTypeMarkdown,
+					Changelog:     "[v1.2.3](https://github.com/FabricMC/fabric-example-mod/releases/tag/v1.2.3)",
+					Relations: &ProjectUploadFileMetadataRelations{
+						Projects: []ProjectUploadFileMetadataRelationsProject{
+							{Slug: "cloth-config", Type: ProjectUploadFileMetadataRelationsProjectTypeEmbeddedLibrary},
+							{Slug: "fabric-api", Type: ProjectUploadFileMetadataRelationsProjectTypeRequiredDependency},
+							{Slug: "modmenu", Type: ProjectUploadFileMetadataRelationsProjectTypeOptionalDependency},
+						},
+					},
+				},
+			},
+			boundary: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
+			want: strings.Join([]string{
+				`--0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab`,
+				`Content-Disposition: form-data; name="file"; filename="example-mod-1.2.3.jar"`,
+				`Content-Type: application/octet-stream`,
+				``,
+				`mod.jar`,
+				`--0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab`,
+				`Content-Disposition: form-data; name="metadata"`,
+				``,
+				`{"displayName":"Example Mod v1.2.3","gameVersions":[7499,9638,9639,11135,13927,13964],"releaseType":"release","changelogType":"markdown","changelog":"[v1.2.3](https://github.com/FabricMC/fabric-example-mod/releases/tag/v1.2.3)","relations":{"projects":[{"slug":"cloth-config","type":"embeddedLibrary"},{"slug":"fabric-api","type":"requiredDependency"},{"slug":"modmenu","type":"optionalDependency"}]}}`,
+				`--0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab--`,
+				``,
+			}, "\r\n"),
+			want2:   "multipart/form-data; boundary=0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var c client
+			got, got2, err := c.createProjectUploadFileContent(context.Background(), tt.input, tt.boundary)
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Nil(t, got)
+				assert.Empty(t, got2)
+			} else {
+				assert.NoError(t, err)
+				body, err := io.ReadAll(got)
+				assert.NoError(t, err)
+				assert.Equal(t, tt.want, string(body))
+				assert.Equal(t, tt.want2, got2)
 			}
 		})
 	}

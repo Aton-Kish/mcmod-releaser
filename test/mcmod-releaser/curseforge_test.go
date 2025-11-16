@@ -56,7 +56,7 @@ func TestIntegration_CurseForge(t *testing.T) {
 	invalidProjectID := 999999
 	s.RegisterProjectID(validProjectID)
 
-	tempFilePath := filepath.Join(t.TempDir(), "mod.jar")
+	tempFilePath := filepath.Join(t.TempDir(), "example-mod-1.2.3.jar")
 	assert.NoError(t, os.WriteFile(tempFilePath, []byte{}, 0o644))
 
 	tests := []struct {
