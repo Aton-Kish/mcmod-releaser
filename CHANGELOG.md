@@ -7,6 +7,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 <a name="unreleased"></a>
 ## [Unreleased]
 
+<a name="v0.1.1"></a>
+## [v0.1.1] - 2025-11-16
+
+### Bug fixes
+
+- [`8be5fb8`](https://github.com/Aton-Kish/mcmod-releaser/commit/8be5fb80631852c0f32b16477ba7e0a3c2bf6c59) replaced fixed file name "mod.jar" with the actual file base name ([#2](https://github.com/Aton-Kish/mcmod-releaser/issues/2))
+
 <a name="v0.1.0"></a>
 ## v0.1.0 - 2025-11-15
 
@@ -33,6 +40,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Documentation
 
+- [`797f7bf`](https://github.com/Aton-Kish/mcmod-releaser/commit/797f7bf6f4b861eb473804dcf4fa72253aebc648) updated CHANGELOG for v0.1.0
 - [`a80170b`](https://github.com/Aton-Kish/mcmod-releaser/commit/a80170bd0ee1fa4c0560aa8531bc5a90148cb697) updated README.md
 
 ### Features
@@ -42,4 +50,5 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - [`bbb9c5d`](https://github.com/Aton-Kish/mcmod-releaser/commit/bbb9c5d576e547970dde1ce45be59fabb8ccf9b1) added curseforge api client
 - [`8679768`](https://github.com/Aton-Kish/mcmod-releaser/commit/86797682d54544a02aef04ee53f4aae43d04fbf4) added initial cli impl
 
-[Unreleased]: https://github.com/Aton-Kish/mcmod-releaser/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Aton-Kish/mcmod-releaser/compare/v0.1.1...HEAD
+[v0.1.1]: https://github.com/Aton-Kish/mcmod-releaser/compare/v0.1.0...v0.1.1
